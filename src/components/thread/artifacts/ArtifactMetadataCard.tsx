@@ -28,8 +28,9 @@ export const ArtifactMetadataCard: React.FC<ArtifactMetadataCardProps> = ({
   const IconComponent = (Icons as any)[config.icon] || Icons.File;
 
   return (
-    <div className="bg-white border-b border-gray-100 p-6 shadow-sm sticky top-0 z-10">
-      <div className="flex items-start justify-between mb-6">
+    <div className={`bg-white border-b border-gray-100 ${isDetailsCollapsed ? 'p-4' : 'p-6'} shadow-sm sticky top-0 z-10 transition-all duration-200`}>
+      <div className={`flex items-start justify-between ${isDetailsCollapsed ? 'mb-0' : 'mb-6'}`}>
+
         <div className="flex items-center gap-4">
           <div className="p-3 rounded-xl bg-purple-50 border border-purple-100">
             <IconComponent size={24} style={{ color: config.color }} />
