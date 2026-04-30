@@ -7,9 +7,32 @@ export function extractArtifacts(messages: any[]): ArtifactInfo[] {
   const artifacts: ArtifactInfo[] = [];
 
   for (const msg of messages) {
-    // Look for tool calls in AI messages
-    if (msg.type === 'ai' && msg.tool_calls && Array.isArray(msg.tool_calls)) {
-      for (const tc of msg.tool_calls) {
+    if (msg.type === 'ai') {
+      let tcs = msg.tool_calls || [];
+      
+      // Fallback: extract tool calls from content blocks (Anthropic / Bedrock style)
+      if ((!tcs || tcs.length === 0) && Array.isArray(msg.content)) {
+        const toolUseBlocks = msg.content.filter((c: any) => c.type === 'tool_use' || c.type === 'tool_call');
+        tcs = toolUseBlocks.map((tc: any) => {
+          let parsedArgs = {};
+          if (typeof tc.input === 'string') {
+            try { parsedArgs = JSON.parse(tc.input); } catch { /* ignore */ }
+          } else if (typeof tc.input === 'object' && tc.input !== null) {
+            parsedArgs = tc.input;
+          } else if (typeof tc.args === 'object' && tc.args !== null) {
+            parsedArgs = tc.args;
+          }
+          return {
+            id: tc.id || tc.tool_call_id,
+            name: tc.name,
+            args: parsedArgs,
+            type: 'tool_call'
+          };
+        }).filter((tc: any) => tc.id && tc.name);
+      }
+
+      for (const tc of tcs) {
+        if (!tc) continue;
         const artifact = processToolCall(tc, messages);
         if (artifact) {
           artifacts.push(artifact);
@@ -138,12 +161,24 @@ function processToolCall(toolCall: any, allMessages: any[]): ArtifactInfo | null
     }
 
     case 'read_file': {
-      const filePath = args.file_path || args.file || args.path || '';
-      const content = toolResult?.content || '';
+      let filePath = args?.file_path || args?.file || args?.path || '';
+      if (!filePath && typeof args === 'string') filePath = args;
+      
+      const content = typeof toolResult?.content === 'string' ? toolResult.content : JSON.stringify(toolResult?.content || '');
       
       // If error or extremely short, skip
       if (content.startsWith('[ERROR]')) return null;
-      if (!content && !filePath) return null;
+      if (!content) return null;
+
+      // Fallback: guess if it's a reference based on content frontmatter or markers
+      if (!filePath && content.includes('_analyst/')) {
+        filePath = 'unknown_analyst_file.md'; 
+      }
+      if (!filePath && content.includes('ref_id:')) {
+        filePath = 'reference.md';
+      }
+
+      if (!filePath) return null;
 
       const frontmatter = parseFrontmatter(content);
       const { group, type } = classifyArtifact(filePath, frontmatter?.type);
@@ -156,7 +191,7 @@ function processToolCall(toolCall: any, allMessages: any[]): ArtifactInfo | null
       else if (filePath.endsWith('.svg')) format = 'svg';
 
       // To avoid clutter, only capture specific formats or known research/lesson paths
-      if (!filePath.match(/\.(md|json|svg|py|js)$/i) && type === 'UNKNOWN') {
+      if (!filePath.match(/\.(md|json|svg|py|js)$/i) && type === 'UNKNOWN' && group !== 'research') {
         return null;
       }
 
@@ -170,7 +205,7 @@ function processToolCall(toolCall: any, allMessages: any[]): ArtifactInfo | null
         size: new TextEncoder().encode(content).length,
         format: format as ArtifactFormat,
         group: group as ArtifactGroup,
-        type: type || (frontmatter?.type as string) || 'UNKNOWN',
+        type: type !== 'UNKNOWN' ? type : ((frontmatter?.type as string) || 'CACHED_REF'),
         title: frontmatter?.title || frontmatter?.ref_id || getBasename(filePath),
         version: frontmatter?.version,
         date: frontmatter?.date || frontmatter?.crawled_at,
@@ -187,7 +222,8 @@ function processToolCall(toolCall: any, allMessages: any[]): ArtifactInfo | null
 }
 
 function parseFrontmatter(content: string): Record<string, any> | null {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  // Support both \n and \r\n, and optional leading whitespace
+  const match = content.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return null;
   
   const lines = match[1].split('\n');
@@ -219,14 +255,15 @@ function parseFrontmatter(content: string): Record<string, any> | null {
 }
 
 function classifyArtifact(filePath: string, frontmatterType?: string): { group: ArtifactGroup; type: string } {
+  const normalizedPath = filePath.replace(/\\/g, '/');
   // Research group
-  if (filePath.includes('/_analyst/')) {
-    if (filePath.endsWith('REFERENCE_REGISTRY.json')) return { group: 'research', type: 'REFERENCE_REGISTRY' };
-    if (filePath.includes('PROJECT_BRIEF'))  return { group: 'research', type: 'PROJECT_BRIEF' };
-    if (filePath.includes('LEARNER_PROFILE')) return { group: 'research', type: 'LEARNER_PROFILE' };
-    if (filePath.includes('REFERENCE_PACK')) return { group: 'research', type: 'REFERENCE_PACK' };
-    if (filePath.includes('RESEARCH_NOTES')) return { group: 'research', type: 'RESEARCH_NOTES' };
-    if (filePath.includes('_references/'))   return { group: 'research', type: 'CACHED_REF' };
+  if (normalizedPath.includes('_analyst/')) {
+    if (normalizedPath.endsWith('REFERENCE_REGISTRY.json')) return { group: 'research', type: 'REFERENCE_REGISTRY' };
+    if (normalizedPath.includes('PROJECT_BRIEF'))  return { group: 'research', type: 'PROJECT_BRIEF' };
+    if (normalizedPath.includes('LEARNER_PROFILE')) return { group: 'research', type: 'LEARNER_PROFILE' };
+    if (normalizedPath.includes('REFERENCE_PACK')) return { group: 'research', type: 'REFERENCE_PACK' };
+    if (normalizedPath.includes('RESEARCH_NOTES')) return { group: 'research', type: 'RESEARCH_NOTES' };
+    if (normalizedPath.includes('_references/'))   return { group: 'research', type: 'CACHED_REF' };
     return { group: 'research', type: 'UNKNOWN' };
   }
   

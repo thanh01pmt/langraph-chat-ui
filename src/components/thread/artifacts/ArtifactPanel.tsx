@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { ArtifactService } from '@/services/artifact-service';
+
 import './artifact-panel.css';
 import { useQueryState, parseAsBoolean, parseAsString } from 'nuqs';
 import { useStreamContext } from '@/providers/Stream';
@@ -6,7 +8,7 @@ import { extractArtifacts } from './artifact-utils';
 import { ArtifactListPanel } from './ArtifactListPanel';
 import { ArtifactPreviewPanel } from './ArtifactPreviewPanel';
 import { MobileArtifactTabs, MobileTab } from './MobileArtifactTabs';
-import { ArtifactGroup, PanelState } from './artifact-types';
+import { ArtifactInfo, ArtifactGroup, ArtifactFormat, PanelState } from './artifact-types';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 export const ArtifactPanel: React.FC = () => {
@@ -81,19 +83,63 @@ export const ArtifactPanel: React.FC = () => {
 
 // Hook for sharing artifact state with main Thread component
 export function useArtifactPanel() {
-  const { messages } = useStreamContext();
+  const { messages, values } = useStreamContext();
+  const projectPath = (values as any)?.project_path;
+
   const [isOpen, setIsOpen] = useQueryState('artifacts', parseAsBoolean.withDefault(false));
   const [selectedId, setSelectedId] = useQueryState('artifactId', parseAsString);
   const [activeGroup, setActiveGroup] = useQueryState('artifactGroup', parseAsString.withDefault('lesson'));
   
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  const [systemArtifacts, setSystemArtifacts] = useState<ArtifactInfo[]>([]);
 
-  const artifacts = useMemo(() => extractArtifacts(messages), [messages]);
+  const [contentCache, setContentCache] = useState<Record<string, string>>({});
+
+  // Sync with filesystem
+  useEffect(() => {
+    if (projectPath && isOpen) {
+      ArtifactService.listArtifacts(projectPath).then(setSystemArtifacts);
+    }
+  }, [projectPath, isOpen]);
+
+  const messageArtifacts = useMemo(() => extractArtifacts(messages), [messages]);
+
+  const artifacts = useMemo(() => {
+    const merged = [...messageArtifacts];
+    const existingPaths = new Set(merged.map(a => a.filePath).filter(Boolean));
+    
+    for (const sa of systemArtifacts) {
+      if (!existingPaths.has(sa.filePath)) {
+        merged.push(sa);
+        existingPaths.add(sa.filePath);
+      }
+    }
+
+    // Apply content from cache for artifacts that don't have it
+    return merged.map(art => ({
+      ...art,
+      content: art.content || contentCache[art.filePath || ''] || ''
+    }));
+  }, [messageArtifacts, systemArtifacts, contentCache]);
+
   const selectedArtifact = useMemo(() => 
     artifacts.find(a => a.id === selectedId), 
     [artifacts, selectedId]
   );
+
+  // Lazy load content
+  useEffect(() => {
+    if (selectedArtifact && !selectedArtifact.content && selectedArtifact.filePath) {
+      ArtifactService.getArtifactContent(selectedArtifact.filePath).then(content => {
+        if (content) {
+          setContentCache(prev => ({ ...prev, [selectedArtifact.filePath!]: content }));
+        }
+      });
+    }
+  }, [selectedArtifact]);
+
 
   const panelState: PanelState = useMemo(() => {
     if (!isOpen) return 'S1';
