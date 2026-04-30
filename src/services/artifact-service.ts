@@ -1,6 +1,6 @@
 import { ArtifactInfo, ArtifactGroup, ArtifactFormat } from '../components/thread/artifacts/artifact-types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:2024';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export interface ProjectArtifact {
   path: string;
@@ -60,16 +60,20 @@ export const ArtifactService = {
   /**
    * Fetches content for a specific artifact
    */
-  async getArtifactContent(filePath: string): Promise<string> {
+  async getArtifactContent(path: string): Promise<string | null> {
     try {
-      const response = await fetch(`${API_URL}/projects/artifacts/content?path=${encodeURIComponent(filePath)}`);
-      if (!response.ok) throw new Error('Failed to fetch content');
-      
+      const url = `${API_URL}/projects/artifacts/content?path=${encodeURIComponent(path)}`;
+      console.log('Fetching artifact content:', url);
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error('Artifact fetch failed:', response.status, response.statusText);
+        return null;
+      }
       const data = await response.json();
-      return data.content || '';
+      return data.content;
     } catch (error) {
       console.error('Error fetching artifact content:', error);
-      return '';
+      return null;
     }
-  }
+  },
 };

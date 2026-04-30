@@ -11,6 +11,7 @@ interface ArtifactPreviewPanelProps {
   onCollapse: () => void;
   isFullscreen: boolean;
   isCollapsed: boolean;
+  isLoading?: boolean;
 }
 
 export const ArtifactPreviewPanel: React.FC<ArtifactPreviewPanelProps> = ({
@@ -19,9 +20,11 @@ export const ArtifactPreviewPanel: React.FC<ArtifactPreviewPanelProps> = ({
   onFullscreen,
   onCollapse,
   isFullscreen,
-  isCollapsed
+  isCollapsed,
+  isLoading
 }) => {
   if (!artifact) {
+    // ... (rest of "No artifact selected" remains same)
     return (
       <div className="h-full flex flex-col items-center justify-center bg-gray-50/30 text-gray-400 p-8 text-center border-l border-gray-100">
         <div className="w-20 h-20 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mb-4 text-purple-200">
@@ -36,6 +39,25 @@ export const ArtifactPreviewPanel: React.FC<ArtifactPreviewPanelProps> = ({
   }
 
   const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-4 text-gray-400">
+          <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+          <p className="text-sm font-medium">Loading content...</p>
+        </div>
+      );
+    }
+
+    if (!artifact.content) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full gap-4 text-gray-400 p-8">
+          <FileSearch size={48} className="opacity-20" />
+          <p className="text-sm font-medium">No content available</p>
+          <p className="text-xs text-center max-w-xs">This might be because the file is still being generated or is empty.</p>
+        </div>
+      );
+    }
+
     switch (artifact.format) {
       case 'json':
         return (
@@ -47,7 +69,7 @@ export const ArtifactPreviewPanel: React.FC<ArtifactPreviewPanelProps> = ({
         );
       case 'md': {
         // Strip frontmatter from preview if it exists
-        const cleanContent = artifact.content.replace(/^---\n[\s\S]*?\n---\n/, '');
+        const cleanContent = artifact.content.replace(/^---\r?\n[\s\S]*?\r?\n---/, '').trim();
         return (
           <div className="p-8 max-w-4xl mx-auto prose prose-purple prose-sm sm:prose lg:prose-lg xl:prose-2xl">
             <MarkdownText>{cleanContent}</MarkdownText>
@@ -69,7 +91,6 @@ export const ArtifactPreviewPanel: React.FC<ArtifactPreviewPanelProps> = ({
         return (
           <div className="flex flex-col items-center justify-center p-12 bg-gray-50 h-full">
              <div className="bg-white p-2 rounded-lg shadow-2xl border border-gray-200 max-w-full">
-                {/* For binary assets we'd need a real URL, but for SVG or base64 we can render here */}
                 {artifact.format === 'svg' && artifact.content ? (
                   <div dangerouslySetInnerHTML={{ __html: artifact.content }} />
                 ) : (

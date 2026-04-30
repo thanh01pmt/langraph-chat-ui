@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ArtifactService } from '@/services/artifact-service';
 
 import './artifact-panel.css';
@@ -12,23 +12,17 @@ import { ArtifactInfo, ArtifactGroup, ArtifactFormat, PanelState } from './artif
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 export const ArtifactPanel: React.FC = () => {
-  const { messages } = useStreamContext();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const {
+    isOpen, setIsOpen,
+    selectedId, setSelectedId,
+    activeGroup, setActiveGroup,
+    artifacts,
+    selectedArtifact,
+    isContentLoading
+  } = useArtifactPanel();
 
-  // URL States
-  const [isOpen, setIsOpen] = useQueryState('artifacts', parseAsBoolean.withDefault(false));
-  const [selectedId, setSelectedId] = useQueryState('artifactId', parseAsString);
-  const [activeGroup, setActiveGroup] = useQueryState('artifactGroup', parseAsString.withDefault('lesson'));
-  
-  // Local States
   const [mobileTab, setMobileTab] = useState<MobileTab>('chat');
-
-  // Extraction
-  const allArtifacts = useMemo(() => extractArtifacts(messages), [messages]);
-  const selectedArtifact = useMemo(() => 
-    allArtifacts.find(a => a.id === selectedId), 
-    [allArtifacts, selectedId]
-  );
 
   if (!isOpen && isDesktop) return null;
 
@@ -39,14 +33,14 @@ export const ArtifactPanel: React.FC = () => {
         {mobileTab === 'artifacts' && (
           <div className="fixed inset-0 bg-white z-40 pb-16">
             <ArtifactListPanel 
-              artifacts={allArtifacts}
+              artifacts={artifacts}
               selectedId={selectedId}
               onSelect={(id) => {
                 setSelectedId(id);
                 setMobileTab('preview');
               }}
               onClose={() => setIsOpen(false)}
-              activeGroup={activeGroup as ArtifactGroup}
+              activeGroup={activeGroup}
               onGroupChange={(g) => setActiveGroup(g)}
               isCompact={false}
             />
@@ -61,23 +55,20 @@ export const ArtifactPanel: React.FC = () => {
               onCollapse={() => {}}
               isFullscreen={false}
               isCollapsed={false}
+              isLoading={isContentLoading}
             />
           </div>
         )}
         <MobileArtifactTabs 
           activeTab={mobileTab}
           onTabChange={setMobileTab}
-          artifactCount={allArtifacts.length}
+          artifactCount={artifacts.length}
           hasSelectedArtifact={!!selectedId}
         />
       </>
     );
   }
 
-  // Render for Desktop (as part of the grid in index.tsx)
-  // This component will be called multiple times for different columns
-  // But we can also export separate components for clarity.
-  // For now, let's export a hook to get the state and data.
   return null;
 };
 
@@ -96,6 +87,7 @@ export function useArtifactPanel() {
   const [systemArtifacts, setSystemArtifacts] = useState<ArtifactInfo[]>([]);
 
   const [contentCache, setContentCache] = useState<Record<string, string>>({});
+  const [isContentLoading, setIsContentLoading] = useState(false);
 
   // Sync with filesystem
   useEffect(() => {
@@ -106,22 +98,31 @@ export function useArtifactPanel() {
 
   const messageArtifacts = useMemo(() => extractArtifacts(messages), [messages]);
 
+  // Normalize path helper
+  const normalizePath = (p?: string) => {
+    if (!p) return '';
+    return p.replace(/\\/g, '/').replace(/^\//, '');
+  };
+
   const artifacts = useMemo(() => {
     const merged = [...messageArtifacts];
-    const existingPaths = new Set(merged.map(a => a.filePath).filter(Boolean));
+    const existingNormalizedPaths = new Set(merged.map(a => normalizePath(a.filePath)));
     
     for (const sa of systemArtifacts) {
-      if (!existingPaths.has(sa.filePath)) {
+      const normPath = normalizePath(sa.filePath);
+      if (!existingNormalizedPaths.has(normPath)) {
         merged.push(sa);
-        existingPaths.add(sa.filePath);
+        existingNormalizedPaths.add(normPath);
       }
     }
 
-    // Apply content from cache for artifacts that don't have it
-    return merged.map(art => ({
-      ...art,
-      content: art.content || contentCache[art.filePath || ''] || ''
-    }));
+    return merged.map(art => {
+      const normPath = normalizePath(art.filePath);
+      return {
+        ...art,
+        content: art.content || contentCache[normPath] || ''
+      };
+    });
   }, [messageArtifacts, systemArtifacts, contentCache]);
 
   const selectedArtifact = useMemo(() => 
@@ -129,17 +130,22 @@ export function useArtifactPanel() {
     [artifacts, selectedId]
   );
 
-  // Lazy load content
+  // Lazy load content - optimize to avoid redundant fetches during streaming
   useEffect(() => {
-    if (selectedArtifact && !selectedArtifact.content && selectedArtifact.filePath) {
-      ArtifactService.getArtifactContent(selectedArtifact.filePath).then(content => {
-        if (content) {
-          setContentCache(prev => ({ ...prev, [selectedArtifact.filePath!]: content }));
-        }
-      });
+    const filePath = selectedArtifact?.filePath;
+    const normPath = normalizePath(filePath);
+    
+    if (filePath && !selectedArtifact?.content && !contentCache[normPath] && !isContentLoading) {
+      setIsContentLoading(true);
+      ArtifactService.getArtifactContent(filePath)
+        .then(content => {
+          if (content !== null) {
+            setContentCache(prev => ({ ...prev, [normPath]: content }));
+          }
+        })
+        .finally(() => setIsContentLoading(false));
     }
-  }, [selectedArtifact]);
-
+  }, [selectedArtifact?.filePath, selectedArtifact?.content, isContentLoading]);
 
   const panelState: PanelState = useMemo(() => {
     if (!isOpen) return 'S1';
@@ -157,6 +163,7 @@ export function useArtifactPanel() {
     isFullscreen, setIsFullscreen,
     artifacts,
     selectedArtifact,
+    isContentLoading,
     panelState
   };
 }

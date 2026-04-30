@@ -155,6 +155,7 @@ export function Thread() {
     setIsFullscreen,
     artifacts,
     selectedArtifact,
+    isContentLoading,
     panelState
   } = useArtifactPanel();
 
@@ -634,6 +635,7 @@ export function Thread() {
               onCollapse={() => setIsListCollapsed((p) => !p)}
               isFullscreen={isFullscreen}
               isCollapsed={isListCollapsed}
+              isLoading={isContentLoading}
             />
           )}
         </div>
