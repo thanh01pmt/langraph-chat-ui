@@ -137,6 +137,50 @@ function processToolCall(toolCall: any, allMessages: any[]): ArtifactInfo | null
       };
     }
 
+    case 'read_file': {
+      const filePath = args.file_path || args.file || args.path || '';
+      const content = toolResult?.content || '';
+      
+      // If error or extremely short, skip
+      if (content.startsWith('[ERROR]')) return null;
+      if (!content && !filePath) return null;
+
+      const frontmatter = parseFrontmatter(content);
+      const { group, type } = classifyArtifact(filePath, frontmatter?.type);
+      
+      let format = 'other';
+      if (filePath.endsWith('.md')) format = 'md';
+      else if (filePath.endsWith('.json')) format = 'json';
+      else if (filePath.endsWith('.js')) format = 'js';
+      else if (filePath.endsWith('.py')) format = 'py';
+      else if (filePath.endsWith('.svg')) format = 'svg';
+
+      // To avoid clutter, only capture specific formats or known research/lesson paths
+      if (!filePath.match(/\.(md|json|svg|py|js)$/i) && type === 'UNKNOWN') {
+        return null;
+      }
+
+      return {
+        id,
+        toolCallId: id,
+        toolName: name,
+        fileName: getBasename(filePath),
+        filePath,
+        content,
+        size: new TextEncoder().encode(content).length,
+        format: format as ArtifactFormat,
+        group: group as ArtifactGroup,
+        type: type || (frontmatter?.type as string) || 'UNKNOWN',
+        title: frontmatter?.title || frontmatter?.ref_id || getBasename(filePath),
+        version: frontmatter?.version,
+        date: frontmatter?.date || frontmatter?.crawled_at,
+        prerequisites: frontmatter?.prerequisite,
+        unitId: extractUnitId(filePath),
+        status,
+        statusMessage: 'Read from disk'
+      };
+    }
+
     default:
       return null;
   }
