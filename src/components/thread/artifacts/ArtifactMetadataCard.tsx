@@ -2,7 +2,8 @@ import React from 'react';
 import { ArtifactInfo, ARTIFACT_TYPE_MAP } from './artifact-types';
 import { formatFileSize } from './artifact-utils';
 import * as Icons from 'lucide-react';
-import { Maximize2, Minimize2, ChevronLeft, X } from 'lucide-react';
+import { Maximize2, Minimize2, ChevronLeft, X, ChevronDown, ChevronUp } from 'lucide-react';
+
 
 interface ArtifactMetadataCardProps {
   artifact: ArtifactInfo;
@@ -21,7 +22,9 @@ export const ArtifactMetadataCard: React.FC<ArtifactMetadataCardProps> = ({
   isFullscreen,
   isCollapsed
 }) => {
+  const [isDetailsCollapsed, setIsDetailsCollapsed] = React.useState(false);
   const config = ARTIFACT_TYPE_MAP[artifact.type] || ARTIFACT_TYPE_MAP['UNKNOWN'];
+
   const IconComponent = (Icons as any)[config.icon] || Icons.File;
 
   return (
@@ -44,7 +47,15 @@ export const ArtifactMetadataCard: React.FC<ArtifactMetadataCardProps> = ({
 
         <div className="flex items-center gap-2">
           <button 
+            onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)}
+            title={isDetailsCollapsed ? "Show Details" : "Hide Details"}
+            className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
+          >
+            {isDetailsCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+          </button>
+          <button 
             onClick={onCollapse}
+
             title={isCollapsed ? "Expand List" : "Collapse List"}
             className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
           >
@@ -66,19 +77,22 @@ export const ArtifactMetadataCard: React.FC<ArtifactMetadataCardProps> = ({
           </button>
         </div>
       </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8 p-4 bg-gray-50 rounded-xl border border-gray-100">
-        <MetaItem label="Title" value={artifact.title} className="col-span-full" />
-        <MetaItem label="Version" value={artifact.version || 'v1.0'} />
-        <MetaItem label="Date" value={artifact.date || new Date().toISOString().split('T')[0]} />
-        <MetaItem label="Size" value={formatFileSize(artifact.size)} />
-        <MetaItem label="Unit" value={artifact.unitId || 'N/A'} />
-        <MetaItem label="Path" value={artifact.filePath} className="col-span-full font-mono text-[10px]" />
-        {artifact.prerequisites && artifact.prerequisites.length > 0 && (
-          <MetaItem label="Prerequisites" value={artifact.prerequisites.join(', ')} className="col-span-full" />
-        )}
-      </div>
+      
+      {!isDetailsCollapsed && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8 p-4 bg-gray-50 rounded-xl border border-gray-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <MetaItem label="Title" value={artifact.title} className="col-span-full" />
+          <MetaItem label="Version" value={artifact.version || 'v1.0'} />
+          <MetaItem label="Date" value={artifact.date || new Date().toISOString().split('T')[0]} />
+          <MetaItem label="Size" value={formatFileSize(artifact.size)} />
+          <MetaItem label="Unit" value={artifact.unitId || 'N/A'} />
+          <MetaItem label="Path" value={artifact.filePath} className="col-span-full font-mono text-[10px]" />
+          {artifact.prerequisites && artifact.prerequisites.length > 0 && (
+            <MetaItem label="Prerequisites" value={artifact.prerequisites.join(', ')} className="col-span-full" />
+          )}
+        </div>
+      )}
     </div>
+
   );
 };
 
