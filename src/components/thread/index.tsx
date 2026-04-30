@@ -22,6 +22,7 @@ import {
   SquarePen,
   XIcon,
   Plus,
+  Package,
 } from "lucide-react";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
@@ -45,6 +46,10 @@ import {
   ArtifactTitle,
   useArtifactContext,
 } from "./artifact";
+import { useArtifactPanel } from "./artifacts/ArtifactPanel";
+import { ArtifactListPanel } from "./artifacts/ArtifactListPanel";
+import { ArtifactPreviewPanel } from "./artifacts/ArtifactPreviewPanel";
+import { MobileArtifactTabs } from "./artifacts/MobileArtifactTabs";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -137,6 +142,23 @@ export function Thread() {
   } = useFileUpload();
   const [firstTokenReceived, setFirstTokenReceived] = useState(false);
   const isLargeScreen = useMediaQuery("(min-width: 1024px)");
+  const {
+    isOpen: artifactPanelOpen,
+    setIsOpen: setArtifactPanelOpen,
+    selectedId: artifactId,
+    setSelectedId: setArtifactId,
+    activeGroup,
+    setActiveGroup,
+    isListCollapsed,
+    setIsListCollapsed,
+    isFullscreen,
+    setIsFullscreen,
+    artifacts,
+    selectedArtifact,
+    panelState
+  } = useArtifactPanel();
+
+  const [mobileTab, setMobileTab] = useState<"chat" | "artifacts" | "preview">("chat");
 
   const stream = useStreamContext();
   const messages = stream.messages;
@@ -284,8 +306,15 @@ export function Thread() {
 
       <div
         className={cn(
-          "grid w-full grid-cols-[1fr_0fr] transition-all duration-500",
-          artifactOpen && "grid-cols-[3fr_2fr]",
+          "grid w-full transition-all duration-500",
+          panelState === "S1" && "grid-cols-[1fr_0fr_0fr]",
+          panelState === "S2" && "grid-cols-[3fr_2fr_0fr]",
+          panelState === "S3" && "grid-cols-[2fr_1fr_2fr]",
+          panelState === "S4" && "grid-cols-[1fr_0fr_1fr]",
+          panelState === "S5" && "grid-cols-[0fr_0fr_1fr]",
+          // Backwards compatibility for existing artifact generative UI
+          artifactOpen && !selectedArtifact && "grid-cols-[3fr_0fr_2fr]",
+          artifactOpen && selectedArtifact && panelState === "S3" && "grid-cols-[2fr_1fr_2fr]",
         )}
       >
         <motion.div
@@ -374,6 +403,23 @@ export function Thread() {
                 <div className="flex items-center">
                   <OpenGitHubRepo />
                 </div>
+                <TooltipIconButton
+                  size="lg"
+                  className="p-4"
+                  tooltip="Artifacts"
+                  variant={artifactPanelOpen ? "secondary" : "ghost"}
+                  onClick={() => setArtifactPanelOpen((p) => !p)}
+                >
+                  <div className="relative">
+                    <Package className="size-5" />
+                    {artifacts.length > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-purple-500 text-[8px] font-bold text-white">
+                        {artifacts.length}
+                      </span>
+                    )}
+                  </div>
+                </TooltipIconButton>
+
                 <TooltipIconButton
                   size="lg"
                   className="p-4"
@@ -545,21 +591,63 @@ export function Thread() {
             />
           </StickToBottom>
         </motion.div>
-        <div className="relative flex flex-col border-l">
-          <div className="absolute inset-0 flex min-w-[30vw] flex-col">
-            <div className="grid grid-cols-[1fr_auto] border-b p-4">
-              <ArtifactTitle className="truncate overflow-hidden" />
-              <button
-                onClick={closeArtifact}
-                className="cursor-pointer"
-              >
-                <XIcon className="size-5" />
-              </button>
+
+        {/* Column 2: Artifact List */}
+        <div className="overflow-hidden border-l bg-white">
+          <ArtifactListPanel
+            artifacts={artifacts}
+            selectedId={artifactId}
+            onSelect={(id) => {
+              setArtifactId(id);
+              if (!isLargeScreen) setMobileTab("preview");
+            }}
+            onClose={() => setArtifactPanelOpen(false)}
+            activeGroup={activeGroup}
+            onGroupChange={setActiveGroup}
+            isCompact={panelState === "S3"}
+          />
+        </div>
+
+        {/* Column 3: Preview Panel / Generative UI */}
+        <div className="overflow-hidden border-l bg-white">
+          {artifactOpen ? (
+            <div className="flex h-full flex-col bg-white">
+              <div className="flex items-center justify-between border-b p-4">
+                <ArtifactTitle className="font-bold text-gray-800 truncate" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={closeArtifact}
+                >
+                  <XIcon className="size-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <ArtifactContent />
+              </div>
             </div>
-            <ArtifactContent className="relative flex-grow" />
-          </div>
+          ) : (
+            <ArtifactPreviewPanel
+              artifact={selectedArtifact || null}
+              onClose={() => setArtifactId(null)}
+              onFullscreen={() => setIsFullscreen((p) => !p)}
+              onCollapse={() => setIsListCollapsed((p) => !p)}
+              isFullscreen={isFullscreen}
+              isCollapsed={isListCollapsed}
+            />
+          )}
         </div>
       </div>
+
+      {/* Mobile Bottom Tabs */}
+      {!isLargeScreen && (
+        <MobileArtifactTabs
+          activeTab={mobileTab}
+          onTabChange={setMobileTab}
+          artifactCount={artifacts.length}
+          hasSelectedArtifact={!!selectedArtifact}
+        />
+      )}
     </div>
   );
 }

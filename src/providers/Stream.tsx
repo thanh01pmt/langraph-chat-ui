@@ -177,7 +177,9 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   // Determine final values to use, prioritizing URL params then env vars
-  const finalApiUrl = apiUrl || envApiUrl;
+  const finalApiUrl = (apiUrl || envApiUrl || "").startsWith("/") 
+    ? (typeof window !== "undefined" ? `${window.location.origin}${apiUrl || envApiUrl}` : (apiUrl || envApiUrl))
+    : (apiUrl || envApiUrl);
   const finalAssistantId = assistantId || envAssistantId;
   const finalAuthScheme = authScheme || envAuthScheme || "";
 

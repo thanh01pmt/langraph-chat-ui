@@ -1,0 +1,52 @@
+
+> agent-chat-ui@0.0.0 lint /Users/tonypham/MEGA/langchain-agents/ui
+> next lint
+
+`next lint` is deprecated and will be removed in Next.js 16.
+For new projects, use create-next-app to choose your preferred linter.
+For existing projects, migrate to the ESLint CLI:
+npx @next/codemod@canary next-lint-to-eslint-cli .
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/tonypham/pnpm-lock.yaml as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Users/tonypham/MEGA/langchain-agents/ui/pnpm-lock.yaml
+
+
+ ⚠ The Next.js plugin was not detected in your ESLint configuration. See https://nextjs.org/docs/app/api-reference/config/eslint#migrating-existing-config
+
+./src/app/layout.tsx
+13:14  Warning: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.  react-refresh/only-export-components
+
+./src/components/thread/agent-inbox/components/tool-call-table.tsx
+32:22  Warning: '_' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/thread/agent-inbox/utils.ts
+83:12  Warning: '_' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/components/thread/artifact.tsx
+120:17  Warning: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.  react-refresh/only-export-components
+172:17  Warning: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.  react-refresh/only-export-components
+186:17  Warning: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.  react-refresh/only-export-components
+
+./src/components/thread/artifacts/ArtifactPanel.tsx
+83:17  Warning: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.  react-refresh/only-export-components
+
+./src/components/thread/artifacts/artifact-utils.ts
+1:39  Warning: 'ArtifactFormat' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+./src/components/thread/history/index.tsx
+95:6  Warning: React Hook useEffect has missing dependencies: 'getThreads', 'setThreads', and 'setThreadsLoading'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/ui/button.tsx
+61:18  Warning: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.  react-refresh/only-export-components
+
+./src/providers/Stream.tsx
+318:14  Warning: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.  react-refresh/only-export-components
+
+./src/providers/Thread.tsx
+84:17  Warning: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.  react-refresh/only-export-components
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
