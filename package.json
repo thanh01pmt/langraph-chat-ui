@@ -16,7 +16,12 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "docker:up": "docker compose -f ../docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f ../docker/docker-compose.yml down",
+    "docker:build": "docker compose -f ../docker/docker-compose.yml build",
+    "docker:studio": "docker compose -f ../docker/docker-compose.yml up -d --build course-studio",
+    "docker:logs": "docker compose -f ../docker/docker-compose.yml logs -f"
   },
   "dependencies": {
     "@langchain/core": "^1.1.28",

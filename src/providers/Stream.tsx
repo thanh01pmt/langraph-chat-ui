@@ -26,7 +26,15 @@ import { getApiKey } from "@/lib/api-key";
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
 
-export type StateType = { messages: Message[]; ui?: UIMessage[] };
+export type StateType = {
+  messages: Message[];
+  ui?: UIMessage[];
+  context?: Record<string, unknown>;
+  context_payload?: Record<string, unknown>;
+  project_path?: string;
+  project_name?: string;
+  project_id?: string;
+};
 
 const useTypedStream = useStream<
   StateType,
@@ -35,6 +43,10 @@ const useTypedStream = useStream<
       messages?: Message[] | Message | string;
       ui?: (UIMessage | RemoveUIMessage)[] | UIMessage | RemoveUIMessage;
       context?: Record<string, unknown>;
+      project_path?: string;
+      project_name?: string;
+      project_id?: string;
+      context_payload?: Record<string, unknown>;
     };
     CustomEventType: UIMessage | RemoveUIMessage;
   }
@@ -177,9 +189,11 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   // Determine final values to use, prioritizing URL params then env vars
-  const finalApiUrl = (apiUrl || envApiUrl || "").startsWith("/") 
-    ? (typeof window !== "undefined" ? `${window.location.origin}${apiUrl || envApiUrl}` : (apiUrl || envApiUrl))
-    : (apiUrl || envApiUrl);
+  const finalApiUrl = (apiUrl || envApiUrl || "").startsWith("/")
+    ? typeof window !== "undefined"
+      ? `${window.location.origin}${apiUrl || envApiUrl}`
+      : apiUrl || envApiUrl
+    : apiUrl || envApiUrl;
   const finalAssistantId = assistantId || envAssistantId;
   const finalAuthScheme = authScheme || envAuthScheme || "";
 

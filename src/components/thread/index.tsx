@@ -46,10 +46,13 @@ import {
   ArtifactTitle,
   useArtifactContext,
 } from "./artifact";
+import { resolveActiveProjectContext } from "@/lib/project-context";
 import { useArtifactPanel } from "./artifacts/ArtifactPanel";
 import { ArtifactListPanel } from "./artifacts/ArtifactListPanel";
 import { ArtifactPreviewPanel } from "./artifacts/ArtifactPreviewPanel";
 import { MobileArtifactTabs } from "./artifacts/MobileArtifactTabs";
+
+const LIVE_STREAM_MODE = ["values", "messages-tuple"] as const;
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -156,10 +159,12 @@ export function Thread() {
     artifacts,
     selectedArtifact,
     isContentLoading,
-    panelState
+    panelState,
   } = useArtifactPanel();
 
-  const [mobileTab, setMobileTab] = useState<"chat" | "artifacts" | "preview">("chat");
+  const [mobileTab, setMobileTab] = useState<"chat" | "artifacts" | "preview">(
+    "chat",
+  );
 
   const stream = useStreamContext();
   const messages = stream.messages;
@@ -217,7 +222,7 @@ export function Thread() {
     prevMessageLength.current = messages.length;
   }, [messages]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if ((input.trim().length === 0 && contentBlocks.length === 0) || isLoading)
       return;
@@ -236,16 +241,32 @@ export function Thread() {
 
     const context =
       Object.keys(artifactContext).length > 0 ? artifactContext : undefined;
+    const projectContext = await resolveActiveProjectContext(stream.values);
+    const contextPayload = {
+      ...(projectContext.context_payload ?? {}),
+      ...(context ? { artifact: context } : {}),
+    };
 
     stream.submit(
-      { messages: [...toolMessages, newHumanMessage], context },
       {
-        streamMode: ["values"],
+        messages: [...toolMessages, newHumanMessage],
+        ...(context ? { context } : {}),
+        ...projectContext,
+        ...(Object.keys(contextPayload).length > 0
+          ? { context_payload: contextPayload }
+          : {}),
+      },
+      {
+        streamMode: [...LIVE_STREAM_MODE],
         streamSubgraphs: true,
         streamResumable: true,
         optimisticValues: (prev) => ({
           ...prev,
-          context,
+          ...projectContext,
+          ...(Object.keys(contextPayload).length > 0
+            ? { context_payload: contextPayload }
+            : {}),
+          ...(context ? { context } : {}),
           messages: [
             ...(prev.messages ?? []),
             ...toolMessages,
@@ -267,7 +288,7 @@ export function Thread() {
     setFirstTokenReceived(false);
     stream.submit(undefined, {
       checkpoint: parentCheckpoint,
-      streamMode: ["values"],
+      streamMode: [...LIVE_STREAM_MODE],
       streamSubgraphs: true,
       streamResumable: true,
     });
@@ -315,7 +336,10 @@ export function Thread() {
           panelState === "S5" && "grid-cols-[0fr_0fr_1fr]",
           // Backwards compatibility for existing artifact generative UI
           artifactOpen && !selectedArtifact && "grid-cols-[3fr_0fr_2fr]",
-          artifactOpen && selectedArtifact && panelState === "S3" && "grid-cols-[2fr_1fr_2fr]",
+          artifactOpen &&
+            selectedArtifact &&
+            panelState === "S3" &&
+            "grid-cols-[2fr_1fr_2fr]",
         )}
       >
         <motion.div
@@ -614,7 +638,7 @@ export function Thread() {
           {artifactOpen ? (
             <div className="flex h-full flex-col bg-white">
               <div className="flex items-center justify-between border-b p-4">
-                <ArtifactTitle className="font-bold text-gray-800 truncate" />
+                <ArtifactTitle className="truncate font-bold text-gray-800" />
                 <Button
                   variant="ghost"
                   size="icon"
@@ -636,6 +660,7 @@ export function Thread() {
               isFullscreen={isFullscreen}
               isCollapsed={isListCollapsed}
               isLoading={isContentLoading}
+              isStreaming={isLoading}
             />
           )}
         </div>

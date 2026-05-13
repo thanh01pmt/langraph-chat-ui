@@ -7,6 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { BranchSwitcher, CommandBar } from "./shared";
 import { MultimodalPreview } from "@/components/thread/MultimodalPreview";
 import { isBase64ContentBlock } from "@/lib/multimodal-utils";
+import { resolveActiveProjectContext } from "@/lib/project-context";
+
+const LIVE_STREAM_MODE = ["values", "messages-tuple"] as const;
 
 function EditableContent({
   value,
@@ -49,15 +52,16 @@ export function HumanMessage({
   const [value, setValue] = useState("");
   const contentString = getContentString(message.content);
 
-  const handleSubmitEdit = () => {
+  const handleSubmitEdit = async () => {
     setIsEditing(false);
 
     const newMessage: Message = { type: "human", content: value };
+    const projectContext = await resolveActiveProjectContext(thread.values);
     thread.submit(
-      { messages: [newMessage] },
+      { messages: [newMessage], ...projectContext },
       {
         checkpoint: parentCheckpoint,
-        streamMode: ["values"],
+        streamMode: [...LIVE_STREAM_MODE],
         streamSubgraphs: true,
         streamResumable: true,
         optimisticValues: (prev) => {
@@ -66,6 +70,7 @@ export function HumanMessage({
 
           return {
             ...values,
+            ...projectContext,
             messages: [...(values.messages ?? []), newMessage],
           };
         },

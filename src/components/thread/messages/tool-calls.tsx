@@ -3,8 +3,47 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
+const TOOL_ARG_PREVIEW_CHARS = 1200;
+
 function isComplexValue(value: any): boolean {
   return Array.isArray(value) || (typeof value === "object" && value !== null);
+}
+
+function truncateValue(value: string, limit = TOOL_ARG_PREVIEW_CHARS): string {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit)}\n... (${value.length - limit} more characters)`;
+}
+
+function formatToolArg(
+  key: string,
+  value: any,
+): {
+  text: string;
+  isComplex: boolean;
+} {
+  if (typeof value === "string") {
+    return {
+      text: truncateValue(value),
+      isComplex:
+        key === "content" ||
+        key === "raw_content" ||
+        key.endsWith("_json") ||
+        value.includes("\n"),
+    };
+  }
+
+  if (!isComplexValue(value)) {
+    return { text: String(value), isComplex: false };
+  }
+
+  try {
+    return {
+      text: truncateValue(JSON.stringify(value, null, 2)),
+      isComplex: true,
+    };
+  } catch {
+    return { text: "[Unserializable value]", isComplex: true };
+  }
 }
 
 export function ToolCalls({
@@ -37,22 +76,27 @@ export function ToolCalls({
             {hasArgs ? (
               <table className="min-w-full divide-y divide-gray-200">
                 <tbody className="divide-y divide-gray-200">
-                  {Object.entries(args).map(([key, value], argIdx) => (
-                    <tr key={argIdx}>
-                      <td className="px-4 py-2 text-sm font-medium whitespace-nowrap text-gray-900">
-                        {key}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-500">
-                        {isComplexValue(value) ? (
-                          <code className="rounded bg-gray-50 px-2 py-1 font-mono text-sm break-all">
-                            {JSON.stringify(value, null, 2)}
-                          </code>
-                        ) : (
-                          String(value)
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {Object.entries(args).map(([key, value], argIdx) => {
+                    const formatted = formatToolArg(key, value);
+                    return (
+                      <tr key={argIdx}>
+                        <td className="px-4 py-2 text-sm font-medium whitespace-nowrap text-gray-900">
+                          {key}
+                        </td>
+                        <td className="max-w-[36rem] px-4 py-2 text-sm text-gray-500">
+                          {formatted.isComplex ? (
+                            <code className="block max-h-40 overflow-auto rounded bg-gray-50 px-2 py-1 font-mono text-sm break-words whitespace-pre-wrap">
+                              {formatted.text}
+                            </code>
+                          ) : (
+                            <span className="break-words">
+                              {formatted.text}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (
